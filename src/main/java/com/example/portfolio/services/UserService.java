@@ -80,4 +80,11 @@ public class UserService {
 
         return UserMapper.toResponseDto(u);
     }
+
+    @Transactional(readOnly = true)
+    public UserResponseDto getByEmail(String email) {
+        var u = userRepo.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return UserMapper.toResponseDto(u);
+    }
 }

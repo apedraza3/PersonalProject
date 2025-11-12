@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import jakarta.validation.constraints.Size;
+
 public class TransactionResponseDto {
+    @Size(max = 16)
     private Integer id;
     private Integer accountId; // from entity.getAccount().getId()
     private LocalDate date;
