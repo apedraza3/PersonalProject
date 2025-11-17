@@ -12,6 +12,7 @@ import com.example.portfolio.security.JwtUtil;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
+
     private final UserService userService;
     private final JwtUtil jwtUtil;
 
@@ -20,12 +21,26 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    // -----------------------
+    // REGISTER
+    // -----------------------
     @PostMapping("/register")
-    public ResponseEntity<UserResponseDto> register(@Valid @RequestBody UserRegisterDto body) {
-        UserResponseDto created = userService.register(body);
-        return ResponseEntity.ok(created);
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody UserRegisterDto body) {
+        // 1. Create user and get back a DTO
+        UserResponseDto userDto = userService.register(body);
+
+        // 2. Generate JWT using the email from the DTO
+        String token = jwtUtil.generateToken(userDto.getEmail());
+
+        // 3. Return both the user DTO and the token
+        return ResponseEntity.ok(Map.of(
+                "user", userDto,
+                "token", token));
     }
 
+    // -----------------------
+    // LOGIN
+    // -----------------------
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
 
@@ -36,11 +51,19 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required"));
         }
 
-        var userDto = userService.login(email, password);
+        // 1. Authenticate and get back a DTO
+        UserResponseDto userDto = userService.login(email, password);
+
         if (userDto == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid email or password"));
         }
+
+        // 2. Generate JWT using the email from the DTO
         String token = jwtUtil.generateToken(userDto.getEmail());
-        return ResponseEntity.ok(Map.of("user", userDto, "token", token));
+
+        // 3. Return user DTO + token
+        return ResponseEntity.ok(Map.of(
+                "user", userDto,
+                "token", token));
     }
 }

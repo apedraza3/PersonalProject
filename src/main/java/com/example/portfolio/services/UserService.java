@@ -10,6 +10,7 @@ import com.example.portfolio.dto.UserResponseDto;
 import com.example.portfolio.mappers.UserMapper;
 import com.example.portfolio.models.User;
 import com.example.portfolio.repositories.UserRepository;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -37,9 +38,10 @@ public class UserService {
 
     // REGISTER (stores password as-is unless you add hashing)
     public UserResponseDto register(UserRegisterDto dto) {
-        userRepo.findByEmailIgnoreCase(dto.getEmail()).ifPresent(u -> {
+        userRepo.findByEmail(dto.getEmail()).ifPresent(u -> {
             throw new IllegalArgumentException("Email already registered");
         });
+
         User u = new User();
         u.setName(dto.getName());
         u.setEmail(dto.getEmail());
@@ -57,13 +59,15 @@ public class UserService {
     // LOGIN
     @Transactional
     public UserResponseDto login(String email, String password) {
-        var opt = userRepo.findByEmailIgnoreCase(email);
+
+        var opt = userRepo.findByEmail(email);
         if (opt.isEmpty())
             return null;
 
         var u = opt.get();
         String stored = u.getPassword();
         boolean authenticated = false;
+
         if (stored != null && stored.startsWith("$2a$") || (stored != null && stored.startsWith("$2b$"))) {
             authenticated = encoder.matches(password, stored);
         } else {
@@ -83,8 +87,13 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponseDto getByEmail(String email) {
-        var u = userRepo.findByEmailIgnoreCase(email)
+        var u = userRepo.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         return UserMapper.toResponseDto(u);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<User> findByEmail(String email) {
+        return userRepo.findByEmail(email);
     }
 }
