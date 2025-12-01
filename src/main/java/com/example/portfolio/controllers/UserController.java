@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.net.URI;
-import java.util.List;
 import com.example.portfolio.security.CurrentUser;
 
 @RestController
@@ -22,16 +21,23 @@ public class UserController {
         this.currentUser = currentUser;
     }
 
-    // GET /users/{id}
+    // GET /users/{id} - Only allow users to view their own profile
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDto> getById(@PathVariable Integer id) {
-        return ResponseEntity.ok(userService.getById(id));
-    }
+    public ResponseEntity<?> getById(@PathVariable Integer id) {
+        String email = currentUser.email();
+        if (email == null) {
+            return ResponseEntity.status(401).body("Not authenticated");
+        }
 
-    // GET /users (optional)
-    @GetMapping
-    public ResponseEntity<List<UserResponseDto>> listAll() {
-        return ResponseEntity.ok(userService.listAll());
+        UserResponseDto requestedUser = userService.getById(id);
+        UserResponseDto currentUserDto = userService.getByEmail(email);
+
+        // Only allow viewing own profile
+        if (!currentUserDto.getId().equals(id)) {
+            return ResponseEntity.status(403).body("Access denied: you can only view your own profile");
+        }
+
+        return ResponseEntity.ok(requestedUser);
     }
 
     // POST /users (register) — optional

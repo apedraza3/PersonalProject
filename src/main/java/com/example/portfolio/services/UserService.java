@@ -57,7 +57,7 @@ public class UserService {
     }
 
     // LOGIN
-    @Transactional
+    @Transactional(readOnly = true)
     public UserResponseDto login(String email, String password) {
 
         var opt = userRepo.findByEmail(email);
@@ -66,21 +66,10 @@ public class UserService {
 
         var u = opt.get();
         String stored = u.getPassword();
-        boolean authenticated = false;
 
-        if (stored != null && stored.startsWith("$2a$") || (stored != null && stored.startsWith("$2b$"))) {
-            authenticated = encoder.matches(password, stored);
-        } else {
-            authenticated = stored != null && stored.equals(password);
-            if (authenticated) {
-                String newHash = encoder.encode(password);
-                u.setPassword(newHash);
-                u.setUpdatedAt(LocalDateTime.now());
-                userRepo.save(u);
-            }
-        }
-        if (!authenticated)
+        if (stored == null || !encoder.matches(password, stored)) {
             return null;
+        }
 
         return UserMapper.toResponseDto(u);
     }

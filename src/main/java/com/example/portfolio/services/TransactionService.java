@@ -13,6 +13,7 @@ import com.example.portfolio.repositories.TransactionRepository;
 import com.example.portfolio.repositories.AccountRepository;
 import com.example.portfolio.models.Transaction;
 import com.example.portfolio.models.Account;
+import com.example.portfolio.models.User;
 
 @Service
 @Transactional
@@ -26,10 +27,20 @@ public class TransactionService {
         this.accountRepo = accountRepo;
     }
 
+    // Helper method to verify ownership
+    private void verifyAccountOwnership(Account account, User user) {
+        if (!account.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("Access denied: you do not own this account");
+        }
+    }
+
     // CREATE
-    public TransactionResponseDto create(TransactionCreateDto dto) {
+    public TransactionResponseDto create(TransactionCreateDto dto, User currentUser) {
         Account account = accountRepo.findById(dto.getAccountId())
                 .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+
+        // Verify ownership
+        verifyAccountOwnership(account, currentUser);
 
         Transaction tx = new Transaction();
         tx.setAccount(account);
@@ -45,15 +56,21 @@ public class TransactionService {
     }
 
     // UPDATE
-    public TransactionResponseDto update(Integer id, TransactionUpdateDto dto) {
+    public TransactionResponseDto update(Integer id, TransactionUpdateDto dto, User currentUser) {
         Transaction tx = txRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
 
-        // Optional: allow changing account
+        // Verify ownership of current account
+        verifyAccountOwnership(tx.getAccount(), currentUser);
+
+        // Optional: allow changing account (but verify ownership of new account too)
         if (dto.getAccountId() != null && !dto.getAccountId().equals(tx.getAccount().getId())) {
-            Account account = accountRepo.findById(dto.getAccountId())
+            Account newAccount = accountRepo.findById(dto.getAccountId())
                     .orElseThrow(() -> new IllegalArgumentException("Account not found"));
-            tx.setAccount(account);
+
+            // Verify ownership of new account
+            verifyAccountOwnership(newAccount, currentUser);
+            tx.setAccount(newAccount);
         }
 
         tx.setDate(dto.getDate());
@@ -67,9 +84,12 @@ public class TransactionService {
     }
 
     // GET ONE
-    public TransactionResponseDto getOne(Integer id) {
+    public TransactionResponseDto getOne(Integer id, User currentUser) {
         Transaction tx = txRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
+
+        // Verify ownership
+        verifyAccountOwnership(tx.getAccount(), currentUser);
 
         return TransactionMapper.toResponseDto(tx);
     }
@@ -81,7 +101,13 @@ public class TransactionService {
     }
 
     // DELETE
-    public void delete(Integer id) {
+    public void delete(Integer id, User currentUser) {
+        Transaction tx = txRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
+
+        // Verify ownership
+        verifyAccountOwnership(tx.getAccount(), currentUser);
+
         txRepo.deleteById(id);
     }
 }
