@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface PlaidItemRepository extends JpaRepository<PlaidItem, Integer> {
-    List<PlaidItem> findByOwnerId(int userId);
+    List<PlaidItem> findByOwner_Id(Integer userId);
 }

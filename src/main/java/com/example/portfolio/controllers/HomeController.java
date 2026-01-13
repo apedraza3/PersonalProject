@@ -5,8 +5,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class HomeController {
-    @GetMapping({ "/", "/home" })
+    @GetMapping("/")
+    public String index() {
+        return "index"; // Landing page
+    }
+
+    @GetMapping("/home")
     public String home() {
-        return "home"; // resolves to /WEB-INF/views/home.jsp
+        return "home"; // Old test console page
+    }
+
+    @GetMapping("/auth")
+    public String auth() {
+        return "auth"; // Login/Register page
+    }
+
+    @GetMapping("/dashboard")
+    public String dashboard() {
+        return "dashboard"; // Dashboard page
     }
 }

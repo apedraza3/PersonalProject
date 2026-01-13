@@ -16,10 +16,16 @@ import com.plaid.client.model.ItemPublicTokenExchangeResponse;
 import com.plaid.client.model.AccountBase;
 import com.plaid.client.model.AccountsGetRequest;
 import com.plaid.client.model.AccountsGetResponse;
+import com.plaid.client.model.TransactionsGetRequest;
+import com.plaid.client.model.TransactionsGetResponse;
+import com.plaid.client.model.TransactionsGetRequestOptions;
+import com.example.portfolio.models.Transaction;
+import com.example.portfolio.repositories.TransactionRepository;
 import org.springframework.stereotype.Service;
 import retrofit2.Response;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,14 +36,17 @@ public class PlaidService {
     private final PlaidApi plaidApi;
     private final PlaidItemRepository plaidItemRepository;
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
 
     public PlaidService(
             PlaidApi plaidApi,
             PlaidItemRepository plaidItemRepository,
-            AccountRepository accountRepository) {
+            AccountRepository accountRepository,
+            TransactionRepository transactionRepository) {
         this.plaidApi = plaidApi;
         this.plaidItemRepository = plaidItemRepository;
         this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     // ---------------------------
@@ -88,9 +97,7 @@ public class PlaidService {
     // 3. Sync accounts for a user
     // ---------------------------
     public List<Account> syncAccountsForUser(User user) throws IOException {
-        // requires: List<PlaidItem> findByOwnerId(Integer ownerId) in
-        // PlaidItemRepository
-        List<PlaidItem> items = plaidItemRepository.findByOwnerId(user.getId());
+        List<PlaidItem> items = plaidItemRepository.findByOwner_Id(user.getId());
         List<Account> result = new ArrayList<>();
 
         for (PlaidItem item : items) {
@@ -105,12 +112,16 @@ public class PlaidService {
             }
 
             for (AccountBase pa : response.body().getAccounts()) {
-                // For now we just create new Account rows for each Plaid account
-                Account acc = new Account();
+                String plaidAccountId = pa.getAccountId();
+
+                // Check if account already exists, update it instead of creating duplicate
+                Account acc = accountRepository.findByPlaidAccountId(plaidAccountId)
+                        .orElse(new Account());
 
                 // Map Plaid -> your fields
                 acc.setAccountName(pa.getName());
-                acc.setInstitutionString(item.getInstitutionName()); // may be null for now
+                acc.setInstitutionString(item.getInstitutionName());
+                acc.setPlaidAccountId(plaidAccountId);
 
                 // Use subtype if present, else type
                 if (pa.getSubtype() != null) {
@@ -124,11 +135,68 @@ public class PlaidService {
                             pa.getBalances().getCurrent().doubleValue()));
                 }
 
-                acc.setUser(user);
-                acc.setCreatedAt(LocalDateTime.now());
+                // Only set user and createdAt for new accounts
+                if (acc.getId() == null) {
+                    acc.setUser(user);
+                    acc.setCreatedAt(LocalDateTime.now());
+                }
                 acc.setUpdatedAt(LocalDateTime.now());
 
                 result.add(accountRepository.save(acc));
+            }
+        }
+
+        return result;
+    }
+
+    // ---------------------------
+    // 4. Sync transactions for a user
+    // ---------------------------
+    public List<Transaction> syncTransactionsForUser(User user, LocalDate startDate, LocalDate endDate) throws IOException {
+        List<PlaidItem> items = plaidItemRepository.findByOwner_Id(user.getId());
+        List<Transaction> result = new ArrayList<>();
+
+        for (PlaidItem item : items) {
+            TransactionsGetRequest request = new TransactionsGetRequest()
+                    .accessToken(item.getAccessToken())
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .options(new TransactionsGetRequestOptions().count(500)); // Max 500 per request
+
+            Response<TransactionsGetResponse> response = plaidApi.transactionsGet(request).execute();
+
+            if (!response.isSuccessful() || response.body() == null) {
+                throw new IOException("Error fetching transactions from Plaid: " +
+                        (response.errorBody() != null ? response.errorBody().string() : "unknown"));
+            }
+
+            for (com.plaid.client.model.Transaction pt : response.body().getTransactions()) {
+                // Find the account this transaction belongs to
+                String plaidAccountId = pt.getAccountId();
+                Account account = accountRepository.findByPlaidAccountId(plaidAccountId)
+                        .orElse(null);
+
+                if (account == null) {
+                    // Skip transactions for accounts we don't have synced yet
+                    continue;
+                }
+
+                // Create new transaction
+                Transaction tx = new Transaction();
+                tx.setAccount(account);
+                tx.setDate(pt.getDate());
+                tx.setDescription(pt.getName());
+                tx.setAmount(BigDecimal.valueOf(pt.getAmount()));
+
+                // Get first category if available
+                if (pt.getCategory() != null && !pt.getCategory().isEmpty()) {
+                    tx.setCategory(pt.getCategory().get(0));
+                }
+
+                tx.setCreatedAt(LocalDateTime.now());
+                tx.setUpdatedAt(LocalDateTime.now());
+
+                result.add(transactionRepository.save(tx));
             }
         }
 

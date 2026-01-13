@@ -124,4 +124,51 @@ public class PlaidController {
 
         return ResponseEntity.ok(accounts);
     }
+
+    // ---------------------------
+    // 4. Sync transactions from Plaid into our DB
+    // ---------------------------
+    @PostMapping("/transactions/sync")
+    public ResponseEntity<?> syncTransactions(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody(required = false) Map<String, String> body) throws IOException {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid or missing Authorization header"));
+        }
+
+        String rawToken = authHeader.substring(7).trim();
+        String email;
+        try {
+            email = jwtUtil.getSubject(rawToken);
+        } catch (Exception e) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Invalid or expired token"));
+        }
+
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found for email: " + email));
+
+        // Default to last 30 days if no dates provided
+        java.time.LocalDate endDate = java.time.LocalDate.now();
+        java.time.LocalDate startDate = endDate.minusDays(30);
+
+        // Allow custom date range if provided
+        if (body != null) {
+            if (body.containsKey("start_date")) {
+                startDate = java.time.LocalDate.parse(body.get("start_date"));
+            }
+            if (body.containsKey("end_date")) {
+                endDate = java.time.LocalDate.parse(body.get("end_date"));
+            }
+        }
+
+        var transactions = plaidService.syncTransactionsForUser(user, startDate, endDate);
+
+        return ResponseEntity.ok(Map.of(
+                "count", transactions.size(),
+                "transactions", transactions
+        ));
+    }
 }

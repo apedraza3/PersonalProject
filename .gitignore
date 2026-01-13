@@ -39,3 +39,11 @@ src/main/resources/application.yml
 # OS junk files (optional)
 .DS_Store
 Thumbs.db
+
+
+
+.env
+.env.*
+*.local
+application-local.properties
+application-dev.properties

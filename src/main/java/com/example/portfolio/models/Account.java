@@ -28,6 +28,9 @@ public class Account {
     private String accountType;
     private BigDecimal balance;
 
+    @Column(name = "plaid_account_id", unique = true)
+    private String plaidAccountId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -112,6 +115,14 @@ public class Account {
 
     public void setTransactions(List<Transaction> transactions) {
         this.transactions = transactions;
+    }
+
+    public String getPlaidAccountId() {
+        return plaidAccountId;
+    }
+
+    public void setPlaidAccountId(String plaidAccountId) {
+        this.plaidAccountId = plaidAccountId;
     }
 
 }
