@@ -1,4 +1,4 @@
-package com.example.portfolio.controllers;
+package com.example.portfolio.controllers.ApiController;
 
 import com.example.portfolio.models.PlaidItem;
 import com.example.portfolio.models.User;
@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/plaid")
+@RequestMapping("/api/plaid")
 public class PlaidController {
 
     private final PlaidService plaidService;
@@ -168,7 +168,6 @@ public class PlaidController {
 
         return ResponseEntity.ok(Map.of(
                 "count", transactions.size(),
-                "transactions", transactions
-        ));
+                "transactions", transactions));
     }
 }

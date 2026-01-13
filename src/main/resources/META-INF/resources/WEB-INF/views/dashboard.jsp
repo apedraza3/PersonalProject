@@ -313,7 +313,7 @@
         // Fetch user info
         async function loadUserInfo() {
             try {
-                const response = await fetch('/users/me', {
+                const response = await fetch('/api/users/me', {
                     headers: {
                         'Authorization': 'Bearer ' + token
                     }
@@ -334,7 +334,7 @@
         // Load accounts
         async function loadAccounts() {
             try {
-                const response = await fetch('/users/me', {
+                const response = await fetch('/api/users/me', {
                     headers: {
                         'Authorization': 'Bearer ' + token
                     }
@@ -343,7 +343,7 @@
                 const user = await response.json();
                 const userId = user.id;
 
-                const accountsResponse = await fetch(`/users/${userId}`, {
+                const accountsResponse = await fetch(`/api/users/\${userId}`, {
                     headers: {
                         'Authorization': 'Bearer ' + token
                     }
@@ -373,10 +373,10 @@
                         return `
                             <div class="account-item">
                                 <div class="account-info">
-                                    <h4>${account.accountName || 'Account'}</h4>
-                                    <p>${account.accountType || 'Unknown'} • ${account.institutionString || 'Bank'}</p>
+                                    <h4>\${account.accountName || 'Account'}</h4>
+                                    <p>\${account.accountType || 'Unknown'} • \${account.institutionString || 'Bank'}</p>
                                 </div>
-                                <div class="account-balance">$${parseFloat(balance).toFixed(2)}</div>
+                                <div class="account-balance">$\${parseFloat(balance).toFixed(2)}</div>
                             </div>
                         `;
                     }).join('');
@@ -411,7 +411,7 @@
             button.textContent = 'Syncing...';
 
             try {
-                const response = await fetch('/plaid/accounts/sync', {
+                const response = await fetch('/api/plaid/accounts/sync', {
                     method: 'POST',
                     headers: {
                         'Authorization': 'Bearer ' + token
@@ -439,7 +439,7 @@
             button.textContent = 'Syncing...';
 
             try {
-                const response = await fetch('/plaid/transactions/sync', {
+                const response = await fetch('/api/plaid/transactions/sync', {
                     method: 'POST',
                     headers: {
                         'Authorization': 'Bearer ' + token,

@@ -1,4 +1,4 @@
-package com.example.portfolio.controllers;
+package com.example.portfolio.controllers.ApiController;
 
 import com.example.portfolio.dto.UserRegisterDto;
 import com.example.portfolio.dto.UserResponseDto;
@@ -10,7 +10,7 @@ import java.net.URI;
 import com.example.portfolio.security.CurrentUser;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/users")
 public class UserController {
 
     private final UserService userService;

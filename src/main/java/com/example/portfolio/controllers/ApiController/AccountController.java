@@ -1,4 +1,4 @@
-package com.example.portfolio.controllers;
+package com.example.portfolio.controllers.ApiController;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +15,7 @@ import com.example.portfolio.services.TransactionService;
 import com.example.portfolio.services.UserService;
 
 @RestController
-@RequestMapping("/accounts")
+@RequestMapping("/api/accounts")
 public class AccountController {
 
     private final TransactionService transactionService;
@@ -24,9 +24,9 @@ public class AccountController {
     private final UserService userService;
 
     public AccountController(TransactionService transactionService,
-                           AccountRepository accountRepository,
-                           CurrentUser currentUser,
-                           UserService userService) {
+            AccountRepository accountRepository,
+            CurrentUser currentUser,
+            UserService userService) {
         this.transactionService = transactionService;
         this.accountRepository = accountRepository;
         this.currentUser = currentUser;

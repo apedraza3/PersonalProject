@@ -1,4 +1,4 @@
-package com.example.portfolio.controllers;
+package com.example.portfolio.controllers.PageControllers;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
