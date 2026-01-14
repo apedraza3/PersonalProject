@@ -62,7 +62,7 @@ public class PlaidController {
     // ---------------------------
     // 2. Exchange Public Token
     // ---------------------------
-    @PostMapping("/exchange-public-token")
+    @PostMapping("/exchange")
     public ResponseEntity<?> exchangePublicToken(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody Map<String, String> body) throws IOException {

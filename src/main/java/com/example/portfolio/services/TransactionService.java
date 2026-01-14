@@ -100,6 +100,22 @@ public class TransactionService {
         return txs.stream().map(TransactionMapper::toResponseDto).toList();
     }
 
+    // GET ALL FOR USER (across all their accounts)
+    public List<TransactionResponseDto> getTransactionsForUser(Integer userId, Integer days) {
+        // Get all accounts for this user
+        List<Account> userAccounts = accountRepo.findByUserId(userId);
+
+        // Get all transactions for these accounts
+        List<Transaction> allTransactions = userAccounts.stream()
+                .flatMap(account -> txRepo.findByAccountId(account.getId()).stream())
+                .toList();
+
+        // Convert to DTOs
+        return allTransactions.stream()
+                .map(TransactionMapper::toResponseDto)
+                .toList();
+    }
+
     // DELETE
     public void delete(Integer id, User currentUser) {
         Transaction tx = txRepo.findById(id)

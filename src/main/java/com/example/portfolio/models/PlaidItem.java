@@ -1,5 +1,6 @@
 package com.example.portfolio.models;
 
+import com.example.portfolio.security.EncryptedStringConverter;
 import jakarta.persistence.*;
 
 @Entity
@@ -12,6 +13,8 @@ public class PlaidItem {
 
     private String itemId;
 
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 1000) // Encrypted data is longer than plaintext
     private String accessToken;
 
     private String institutionName;

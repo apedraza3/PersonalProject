@@ -317,19 +317,13 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Store JWT token
-                    const token = data.token || data.jwt || data.accessToken;
-                    if (token) {
-                        localStorage.setItem('jwt', token);
-                        showSuccess('login', 'Login successful! Redirecting...');
-                        setTimeout(() => {
-                            window.location.href = '/dashboard';
-                        }, 1000);
-                    } else {
-                        showError('login', 'Login successful but no token received');
-                    }
+                    // JWT is now in HttpOnly cookie (set by server)
+                    showSuccess('login', 'Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
                 } else {
-                    showError('login', data.message || 'Invalid email or password');
+                    showError('login', data.error || data.message || 'Invalid email or password');
                 }
             } catch (error) {
                 showError('login', 'Network error. Please try again.');
@@ -371,10 +365,20 @@
             }
         }
 
-        // Check if already logged in
-        if (localStorage.getItem('jwt')) {
-            window.location.href = '/dashboard';
+        // Check if already logged in by trying to access a protected endpoint
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/users/me', {
+                    credentials: 'include'  // Include cookies in request
+                });
+                if (response.ok) {
+                    window.location.href = '/dashboard';
+                }
+            } catch (error) {
+                // Not logged in, stay on auth page
+            }
         }
+        checkAuth();
     </script>
 </body>
 </html>

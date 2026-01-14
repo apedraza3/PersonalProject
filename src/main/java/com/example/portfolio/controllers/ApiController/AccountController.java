@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.example.portfolio.dto.AccountResponseDto;
 import com.example.portfolio.dto.TransactionResponseDto;
+import com.example.portfolio.mappers.AccountMapper;
 import com.example.portfolio.models.Account;
 import com.example.portfolio.models.User;
 import com.example.portfolio.repositories.AccountRepository;
@@ -31,6 +34,29 @@ public class AccountController {
         this.accountRepository = accountRepository;
         this.currentUser = currentUser;
         this.userService = userService;
+    }
+
+    @GetMapping
+    public ResponseEntity<?> getCurrentUserAccounts() {
+        // Get current authenticated user
+        String email = currentUser.email();
+        if (email == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Not authenticated"));
+        }
+
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Get all accounts for this user
+        List<Account> accounts = accountRepository.findByUserId(user.getId());
+
+        // Convert to DTOs
+        List<AccountResponseDto> accountDtos = accounts.stream()
+                .map(AccountMapper::toResponseDto)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(accountDtos);
     }
 
     @GetMapping("/{id}/transactions")

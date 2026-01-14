@@ -4,6 +4,7 @@ import com.example.portfolio.models.User;
 import com.example.portfolio.repositories.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
@@ -26,29 +27,48 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userRepo = userRepo;
     }
 
+    /**
+     * Extract JWT token from request - checks both Cookie and Authorization header
+     * Cookie is preferred for web app, Authorization header for API clients
+     */
+    private String extractToken(HttpServletRequest request) {
+        // 1. Try to get from cookie first (HttpOnly secure cookie)
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwt".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+
+        // 2. Fallback to Authorization header (for API clients/mobile apps)
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7).trim();
+        }
+
+        return null;
+    }
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7).trim();
+        String token = extractToken(request);
+
+        if (token != null) {
             try {
                 String email = jwtUtil.getSubject(token);
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // Load user (optional: check isActive, etc.)
+                    // Load user
                     User u = userRepo.findByEmail(email).orElse(null);
                     if (u != null) {
                         var auth = new UsernamePasswordAuthenticationToken(
-                                email, // principal (keep it simple: email string)
+                                email, // principal
                                 null, // no credentials
-                                Collections.emptyList() // roles if you add them later
+                                Collections.emptyList() // roles
                         );
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     }
@@ -57,6 +77,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Invalid/expired token → leave context unauthenticated
             }
         }
+
         filterChain.doFilter(request, response);
     }
 }

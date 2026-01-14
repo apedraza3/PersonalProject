@@ -1,5 +1,7 @@
 package com.example.portfolio.controllers.PageControllers;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
@@ -21,6 +23,19 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    /**
+     * Create an HttpOnly secure cookie with the JWT token
+     */
+    private ResponseCookie createJwtCookie(String token) {
+        return ResponseCookie.from("jwt", token)
+                .httpOnly(true)  // Prevents JavaScript access (XSS protection)
+                .secure(false)    // Set to true in production with HTTPS
+                .path("/")
+                .maxAge(24 * 60 * 60)  // 24 hours
+                .sameSite("Lax")  // CSRF protection
+                .build();
+    }
+
     // -----------------------
     // REGISTER
     // -----------------------
@@ -32,10 +47,13 @@ public class AuthController {
         // 2. Generate JWT using the email from the DTO
         String token = jwtUtil.generateToken(userDto.getEmail());
 
-        // 3. Return both the user DTO and the token
-        return ResponseEntity.ok(Map.of(
-                "user", userDto,
-                "token", token));
+        // 3. Set JWT in HttpOnly cookie
+        ResponseCookie jwtCookie = createJwtCookie(token);
+
+        // 4. Return user DTO only (token is in cookie)
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(Map.of("user", userDto));
     }
 
     // -----------------------
@@ -61,9 +79,31 @@ public class AuthController {
         // 2. Generate JWT using the email from the DTO
         String token = jwtUtil.generateToken(userDto.getEmail());
 
-        // 3. Return user DTO + token
-        return ResponseEntity.ok(Map.of(
-                "user", userDto,
-                "token", token));
+        // 3. Set JWT in HttpOnly cookie
+        ResponseCookie jwtCookie = createJwtCookie(token);
+
+        // 4. Return user DTO only (token is in cookie)
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(Map.of("user", userDto));
+    }
+
+    // -----------------------
+    // LOGOUT
+    // -----------------------
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        // Clear the JWT cookie
+        ResponseCookie jwtCookie = ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(false)  // Set to true in production
+                .path("/")
+                .maxAge(0)  // Expire immediately
+                .sameSite("Lax")
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(Map.of("message", "Logged out successfully"));
     }
 }
