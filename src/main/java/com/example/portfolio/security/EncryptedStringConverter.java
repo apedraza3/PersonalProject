@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
  * JPA AttributeConverter that automatically encrypts/decrypts String fields
  * when saving to/loading from the database.
  *
- * Apply to entity fields with: @Convert(converter = EncryptedStringConverter.class)
+ * Apply to entity fields with: @Convert(converter =
+ * EncryptedStringConverter.class)
  */
 @Component
 @Converter

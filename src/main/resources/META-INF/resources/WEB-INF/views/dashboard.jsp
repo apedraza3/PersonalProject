@@ -381,9 +381,26 @@
                     token: linkToken,
                     onSuccess: async (public_token, metadata) => {
                         try {
+                            // Refresh CSRF token after Plaid popup (cookies may be lost)
+                            console.log('🔄 Refreshing CSRF token after Plaid completion...');
+                            await fetch('/api/csrf', { credentials: 'include' });
+
+                            // Small delay to ensure cookie is set
+                            await new Promise(resolve => setTimeout(resolve, 100));
+
                             const csrfToken = getCsrfToken();
+                            console.log('🔐 CSRF Token:', csrfToken);
+                            console.log('🍪 Cookies:', document.cookie);
+
                             const headers = { 'Content-Type': 'application/json' };
-                            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+                            if (csrfToken) {
+                                headers['X-XSRF-TOKEN'] = csrfToken;
+                                console.log('✅ CSRF token added to headers');
+                            } else {
+                                console.error('❌ No CSRF token found!');
+                            }
+
+                            console.log('📤 Sending request to /api/plaid/exchange with headers:', headers);
 
                             const ex = await fetch('/api/plaid/exchange', {
                                 method: 'POST',
@@ -391,6 +408,8 @@
                                 headers: headers,
                                 body: JSON.stringify({ public_token: public_token })
                             });
+
+                            console.log('📥 Response status:', ex.status);
 
                             if (!ex.ok) {
                                 const exText = await ex.text();
@@ -496,15 +515,65 @@
 
         // Load transactions
         async function loadTransactions() {
-            // Note: You'll need to implement an endpoint to get transactions for a user
-            // For now, showing empty state
             const container = document.getElementById('transactions-container');
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📊</div>
-                    <p>No transactions yet. Sync your accounts to see transactions!</p>
-                </div>
-            `;
+
+            try {
+                const response = await fetch('/api/transactions', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load transactions');
+                }
+
+                const transactions = await response.json();
+
+                if (!transactions || transactions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <p>No transactions yet. Sync your accounts to see transactions!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Display transactions in a table
+                container.innerHTML = `
+                    <table class="transactions-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>Account</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            \${transactions.map(t => `
+                                <tr>
+                                    <td>\${new Date(t.date).toLocaleDateString()}</td>
+                                    <td>\${t.description || 'N/A'}</td>
+                                    <td>\${t.category || 'Uncategorized'}</td>
+                                    <td>\${t.accountName || 'N/A'}</td>
+                                    <td class="\${parseFloat(t.amount) < 0 ? 'negative' : 'positive'}">
+                                        $\${Math.abs(parseFloat(t.amount)).toFixed(2)}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load transactions. Please try again.</p>
+                    </div>
+                `;
+            }
         }
 
         async function syncAccounts(event) {
@@ -513,6 +582,10 @@
             button.textContent = 'Syncing...';
 
             try {
+                // Refresh CSRF token before sync
+                await fetch('/api/csrf', { credentials: 'include' });
+                await new Promise(resolve => setTimeout(resolve, 100));
+
                 const csrfToken = getCsrfToken();
                 const response = await fetch('/api/plaid/accounts/sync', {
                     method: 'POST',
@@ -541,6 +614,10 @@
             button.textContent = 'Syncing...';
 
             try {
+                // Refresh CSRF token before sync
+                await fetch('/api/csrf', { credentials: 'include' });
+                await new Promise(resolve => setTimeout(resolve, 100));
+
                 const csrfToken = getCsrfToken();
                 const headers = { 'Content-Type': 'application/json' };
                 if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
