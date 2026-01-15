@@ -181,20 +181,41 @@ public class PlaidService {
                     continue;
                 }
 
-                // Create new transaction
-                Transaction tx = new Transaction();
-                tx.setAccount(account);
-                tx.setDate(pt.getDate());
-                tx.setDescription(pt.getName());
-                tx.setAmount(BigDecimal.valueOf(pt.getAmount()));
+                String plaidTransactionId = pt.getTransactionId();
 
-                // Get first category if available
-                if (pt.getCategory() != null && !pt.getCategory().isEmpty()) {
-                    tx.setCategory(pt.getCategory().get(0));
+                // Check if this transaction already exists (idempotent sync)
+                Transaction tx = transactionRepository.findByPlaidTransactionId(plaidTransactionId)
+                        .orElse(null);
+
+                if (tx != null) {
+                    // Transaction already exists - update it instead of duplicating
+                    tx.setDate(pt.getDate());
+                    tx.setDescription(pt.getName());
+                    tx.setAmount(BigDecimal.valueOf(pt.getAmount()));
+
+                    // Get first category if available
+                    if (pt.getCategory() != null && !pt.getCategory().isEmpty()) {
+                        tx.setCategory(pt.getCategory().get(0));
+                    }
+
+                    tx.setUpdatedAt(LocalDateTime.now());
+                } else {
+                    // New transaction - create it
+                    tx = new Transaction();
+                    tx.setAccount(account);
+                    tx.setPlaidTransactionId(plaidTransactionId);
+                    tx.setDate(pt.getDate());
+                    tx.setDescription(pt.getName());
+                    tx.setAmount(BigDecimal.valueOf(pt.getAmount()));
+
+                    // Get first category if available
+                    if (pt.getCategory() != null && !pt.getCategory().isEmpty()) {
+                        tx.setCategory(pt.getCategory().get(0));
+                    }
+
+                    tx.setCreatedAt(LocalDateTime.now());
+                    tx.setUpdatedAt(LocalDateTime.now());
                 }
-
-                tx.setCreatedAt(LocalDateTime.now());
-                tx.setUpdatedAt(LocalDateTime.now());
 
                 result.add(transactionRepository.save(tx));
             }

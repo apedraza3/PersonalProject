@@ -24,4 +24,14 @@ public class HomeController {
     public String dashboard() {
         return "dashboard"; // Dashboard page
     }
+
+    @GetMapping("/privacy")
+    public String privacy() {
+        return "privacy"; // Privacy Policy page
+    }
+
+    @GetMapping("/terms")
+    public String terms() {
+        return "terms"; // Terms of Service page
+    }
 }

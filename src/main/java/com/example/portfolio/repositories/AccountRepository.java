@@ -11,4 +11,6 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
 
     Optional<Account> findByPlaidAccountId(String plaidAccountId);
 
+    void deleteByUserId(Integer userId);
+
 }

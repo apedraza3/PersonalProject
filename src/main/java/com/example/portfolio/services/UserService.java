@@ -10,6 +10,9 @@ import com.example.portfolio.dto.UserResponseDto;
 import com.example.portfolio.mappers.UserMapper;
 import com.example.portfolio.models.User;
 import com.example.portfolio.repositories.UserRepository;
+import com.example.portfolio.repositories.PlaidItemRepository;
+import com.example.portfolio.repositories.AccountRepository;
+import com.example.portfolio.repositories.RefreshTokenRepository;
 import java.util.Optional;
 
 @Service
@@ -17,10 +20,20 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepo;
+    private final PlaidItemRepository plaidItemRepo;
+    private final AccountRepository accountRepo;
+    private final RefreshTokenRepository refreshTokenRepo;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public UserService(UserRepository userRepo) {
+    public UserService(
+            UserRepository userRepo,
+            PlaidItemRepository plaidItemRepo,
+            AccountRepository accountRepo,
+            RefreshTokenRepository refreshTokenRepo) {
         this.userRepo = userRepo;
+        this.plaidItemRepo = plaidItemRepo;
+        this.accountRepo = accountRepo;
+        this.refreshTokenRepo = refreshTokenRepo;
     }
 
     // READ: get by id
@@ -84,5 +97,31 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
         return userRepo.findByEmail(email);
+    }
+
+    /**
+     * Deletes all user data including:
+     * - RefreshTokens
+     * - PlaidItems (with encrypted access tokens)
+     * - Accounts (cascade deletes Transactions)
+     * - User account
+     *
+     * This is for GDPR compliance / right to be forgotten
+     */
+    public void deleteUserAndAllData(Integer userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 1. Delete all refresh tokens
+        refreshTokenRepo.deleteByUserId(userId);
+
+        // 2. Delete all Plaid items (removes access tokens)
+        plaidItemRepo.deleteByOwner_Id(userId);
+
+        // 3. Delete all accounts (cascade deletes transactions via JPA)
+        accountRepo.deleteByUserId(userId);
+
+        // 4. Delete the user account itself
+        userRepo.delete(user);
     }
 }

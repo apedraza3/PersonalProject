@@ -303,6 +303,27 @@
             </div>
             <div id="transactions-container" class="loading">Loading transactions...</div>
         </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>Account Settings</h2>
+            </div>
+            <div class="card" style="border: 1px solid #fed7d7;">
+                <h3 style="color: #c53030; margin-bottom: 10px;">Danger Zone</h3>
+                <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                    Once you delete your account, there is no going back. This will permanently delete:
+                </p>
+                <ul style="color: #666; margin-bottom: 20px; font-size: 14px; margin-left: 20px;">
+                    <li>Your user account</li>
+                    <li>All connected bank accounts</li>
+                    <li>All transaction history</li>
+                    <li>All Plaid connections</li>
+                </ul>
+                <button class="btn-logout" onclick="deleteAccount()" style="background: #c53030;">
+                    Delete My Account
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -545,6 +566,53 @@
             }
         }
 
+        async function deleteAccount() {
+            // Show confirmation dialog
+            const confirmed = confirm(
+                'Are you absolutely sure you want to delete your account?\n\n' +
+                'This will permanently delete:\n' +
+                '• Your user account\n' +
+                '• All connected bank accounts\n' +
+                '• All transaction history\n' +
+                '• All Plaid connections\n\n' +
+                'This action CANNOT be undone!'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            // Double confirmation
+            const doubleConfirm = confirm(
+                'FINAL WARNING: This is your last chance!\n\n' +
+                'Type OK in your mind and click OK to proceed with account deletion.'
+            );
+
+            if (!doubleConfirm) {
+                return;
+            }
+
+            try {
+                const csrfToken = getCsrfToken();
+                const response = await fetch('/api/users/me', {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: csrfToken ? { 'X-XSRF-TOKEN': csrfToken } : {}
+                });
+
+                if (response.ok) {
+                    alert('Your account has been successfully deleted.');
+                    window.location.href = '/auth';
+                } else {
+                    const error = await response.json();
+                    alert('Failed to delete account: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete account error:', error);
+                alert('Failed to delete account. Please try again.');
+            }
+        }
+
         async function logout() {
             try {
                 // Call logout endpoint to clear cookie
@@ -568,5 +636,11 @@
         }
         initializeDashboard();
     </script>
+
+    <footer style="text-align: center; padding: 40px 20px; color: #666; font-size: 14px;">
+        <a href="/privacy" style="color: #667eea; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
+        <span>•</span>
+        <a href="/terms" style="color: #667eea; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+    </footer>
 </body>
 </html>

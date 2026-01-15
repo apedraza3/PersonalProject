@@ -380,5 +380,11 @@
         }
         checkAuth();
     </script>
+
+    <footer style="text-align: center; padding: 20px; color: #666; font-size: 14px;">
+        <a href="/privacy" style="color: #667eea; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
+        <span>•</span>
+        <a href="/terms" style="color: #667eea; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+    </footer>
 </body>
 </html>

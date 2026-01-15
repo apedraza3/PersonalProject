@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.net.URI;
+import java.util.Map;
 import com.example.portfolio.security.CurrentUser;
 
 @RestController
@@ -54,5 +55,30 @@ public class UserController {
             return ResponseEntity.status(401).build();
         }
         return ResponseEntity.ok(userService.getByEmail(email));
+    }
+
+    /**
+     * DELETE /api/users/me - Delete current user account and all associated data
+     * This implements GDPR "right to be forgotten"
+     *
+     * Deletes:
+     * - User account
+     * - All PlaidItems (encrypted access tokens)
+     * - All Accounts
+     * - All Transactions (cascade via Account deletion)
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<?> deleteAccount() {
+        String email = currentUser.email();
+        if (email == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Not authenticated"));
+        }
+
+        UserResponseDto user = userService.getByEmail(email);
+        userService.deleteUserAndAllData(user.getId());
+
+        return ResponseEntity.ok()
+                .body(Map.of("message", "Account successfully deleted"));
     }
 }

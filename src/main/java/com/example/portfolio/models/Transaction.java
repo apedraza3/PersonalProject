@@ -32,6 +32,9 @@ public class Transaction {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "plaid_transaction_id", unique = true)
+    private String plaidTransactionId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
@@ -99,6 +102,14 @@ public class Transaction {
 
     public void setAccount(Account account) {
         this.account = account;
+    }
+
+    public String getPlaidTransactionId() {
+        return plaidTransactionId;
+    }
+
+    public void setPlaidTransactionId(String plaidTransactionId) {
+        this.plaidTransactionId = plaidTransactionId;
     }
 
 }

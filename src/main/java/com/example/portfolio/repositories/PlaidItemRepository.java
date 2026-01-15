@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface PlaidItemRepository extends JpaRepository<PlaidItem, Integer> {
     List<PlaidItem> findByOwner_Id(Integer userId);
+    void deleteByOwner_Id(Integer userId);
 }

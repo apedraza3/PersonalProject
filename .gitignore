@@ -47,3 +47,5 @@ Thumbs.db
 *.local
 application-local.properties
 application-dev.properties
+
+nul

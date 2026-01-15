@@ -23,4 +23,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.account.id = :accountId")
     BigDecimal SUmAmountByAccountId(@Param("accountId") Integer accountId);
 
+    // Find transaction by Plaid transaction ID (for idempotent sync)
+    java.util.Optional<Transaction> findByPlaidTransactionId(String plaidTransactionId);
+
 }

@@ -91,7 +91,9 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/csrf",
                                 "/api/ping",
-                                "/api/health")
+                                "/api/health",
+                                "/actuator/health",
+                                "/actuator/info")
                         .permitAll()
 
                         // Everything else under /api/** requires JWT
@@ -119,6 +121,8 @@ public class SecurityConfig {
                                 "/home",
                                 "/auth",
                                 "/dashboard",
+                                "/privacy",
+                                "/terms",
                                 "/error",
                                 "/favicon.ico")
                         .permitAll()

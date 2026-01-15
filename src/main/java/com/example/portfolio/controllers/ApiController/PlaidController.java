@@ -2,7 +2,7 @@ package com.example.portfolio.controllers.ApiController;
 
 import com.example.portfolio.models.PlaidItem;
 import com.example.portfolio.models.User;
-import com.example.portfolio.security.JwtUtil;
+import com.example.portfolio.security.CurrentUser;
 import com.example.portfolio.services.PlaidService;
 import com.example.portfolio.services.UserService;
 import org.springframework.http.ResponseEntity;
@@ -16,12 +16,12 @@ import java.util.Map;
 public class PlaidController {
 
     private final PlaidService plaidService;
-    private final JwtUtil jwtUtil;
+    private final CurrentUser currentUser;
     private final UserService userService;
 
-    public PlaidController(PlaidService plaidService, JwtUtil jwtUtil, UserService userService) {
+    public PlaidController(PlaidService plaidService, CurrentUser currentUser, UserService userService) {
         this.plaidService = plaidService;
-        this.jwtUtil = jwtUtil;
+        this.currentUser = currentUser;
         this.userService = userService;
     }
 
@@ -29,56 +29,42 @@ public class PlaidController {
     // 1. Create Plaid Link Token
     // ---------------------------
     @PostMapping("/link-token")
-    public ResponseEntity<?> createLinkToken(
-            @RequestHeader(value = "Authorization", required = false) String authHeader) throws IOException {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid or missing Authorization header"));
-        }
-
-        // remove "Bearer "
-        String rawToken = authHeader.substring(7).trim();
-
-        // get email from JWT
-        String email;
+    public ResponseEntity<?> createLinkToken() {
         try {
-            email = jwtUtil.getSubject(rawToken);
+            String email = currentUser.email();
+            if (email == null) {
+                return ResponseEntity.status(401)
+                        .body(Map.of("error", "Not authenticated"));
+            }
+
+            User user = userService.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found for email: " + email));
+
+            String linkToken = plaidService.createLinkToken(user);
+
+            return ResponseEntity.ok(Map.of("link_token", linkToken));
+        } catch (IOException e) {
+            System.err.println("❌ Plaid Link Token Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Failed to create Plaid link token: " + e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(401)
-                    .body(Map.of("error", "Invalid or expired token"));
+            System.err.println("❌ Unexpected Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Unexpected error: " + e.getMessage()));
         }
-
-        // find user by email
-        User user = userService.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found for email: " + email));
-
-        // ask Plaid for a link token
-        String linkToken = plaidService.createLinkToken(user);
-
-        return ResponseEntity.ok(Map.of("link_token", linkToken));
     }
 
     // ---------------------------
     // 2. Exchange Public Token
     // ---------------------------
     @PostMapping("/exchange")
-    public ResponseEntity<?> exchangePublicToken(
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestBody Map<String, String> body) throws IOException {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid or missing Authorization header"));
-        }
-
-        String rawToken = authHeader.substring(7).trim();
-        String email;
-        try {
-            email = jwtUtil.getSubject(rawToken);
-        } catch (Exception e) {
+    public ResponseEntity<?> exchangePublicToken(@RequestBody Map<String, String> body) throws IOException {
+        String email = currentUser.email();
+        if (email == null) {
             return ResponseEntity.status(401)
-                    .body(Map.of("error", "Invalid or expired token"));
+                    .body(Map.of("error", "Not authenticated"));
         }
 
         User user = userService.findByEmail(email)
@@ -100,21 +86,11 @@ public class PlaidController {
     // 3. Sync accounts from Plaid into our DB
     // ---------------------------
     @PostMapping("/accounts/sync")
-    public ResponseEntity<?> syncAccounts(
-            @RequestHeader(value = "Authorization", required = false) String authHeader) throws IOException {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid or missing Authorization header"));
-        }
-
-        String rawToken = authHeader.substring(7).trim();
-        String email;
-        try {
-            email = jwtUtil.getSubject(rawToken);
-        } catch (Exception e) {
+    public ResponseEntity<?> syncAccounts() throws IOException {
+        String email = currentUser.email();
+        if (email == null) {
             return ResponseEntity.status(401)
-                    .body(Map.of("error", "Invalid or expired token"));
+                    .body(Map.of("error", "Not authenticated"));
         }
 
         User user = userService.findByEmail(email)
@@ -129,22 +105,11 @@ public class PlaidController {
     // 4. Sync transactions from Plaid into our DB
     // ---------------------------
     @PostMapping("/transactions/sync")
-    public ResponseEntity<?> syncTransactions(
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestBody(required = false) Map<String, String> body) throws IOException {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid or missing Authorization header"));
-        }
-
-        String rawToken = authHeader.substring(7).trim();
-        String email;
-        try {
-            email = jwtUtil.getSubject(rawToken);
-        } catch (Exception e) {
+    public ResponseEntity<?> syncTransactions(@RequestBody(required = false) Map<String, String> body) throws IOException {
+        String email = currentUser.email();
+        if (email == null) {
             return ResponseEntity.status(401)
-                    .body(Map.of("error", "Invalid or expired token"));
+                    .body(Map.of("error", "Not authenticated"));
         }
 
         User user = userService.findByEmail(email)

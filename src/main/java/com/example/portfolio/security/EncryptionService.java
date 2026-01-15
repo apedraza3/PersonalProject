@@ -23,15 +23,32 @@ public class EncryptionService {
     private final SecretKeySpec secretKey;
 
     public EncryptionService(@Value("${app.encryption.key}") String encryptionKey) {
+        // Clean up the key (remove whitespace, quotes, etc.)
+        String cleanKey = encryptionKey;
+        if (cleanKey != null) {
+            cleanKey = cleanKey.trim();
+            // Remove surrounding quotes if present
+            if (cleanKey.startsWith("\"") && cleanKey.endsWith("\"")) {
+                cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
+            }
+        }
+
         // Encryption key should be 32 bytes (256 bits) for AES-256
-        if (encryptionKey == null || encryptionKey.length() != 64) {
+        if (cleanKey == null || cleanKey.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Encryption key must be 64 hex characters (32 bytes). " +
+                    "Encryption key is missing. Set APP_ENCRYPTION_KEY environment variable. " +
+                    "Generate with: openssl rand -hex 32");
+        }
+
+        if (cleanKey.length() != 64) {
+            throw new IllegalArgumentException(
+                    "Encryption key must be exactly 64 hex characters (32 bytes). " +
+                    "Current length: " + cleanKey.length() + ". " +
                     "Generate with: openssl rand -hex 32");
         }
 
         // Convert hex string to bytes
-        byte[] keyBytes = hexStringToByteArray(encryptionKey);
+        byte[] keyBytes = hexStringToByteArray(cleanKey);
         this.secretKey = new SecretKeySpec(keyBytes, "AES");
     }
 
