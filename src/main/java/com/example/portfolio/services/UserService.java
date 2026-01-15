@@ -101,27 +101,36 @@ public class UserService {
 
     /**
      * Deletes all user data including:
-     * - RefreshTokens
-     * - PlaidItems (with encrypted access tokens)
-     * - Accounts (cascade deletes Transactions)
+     * - Transactions (via cascade from Accounts)
+     * - Accounts (child of User)
+     * - PlaidItems (child of User, with encrypted access tokens)
+     * - RefreshTokens (child of User)
      * - User account
      *
      * This is for GDPR compliance / right to be forgotten
+     *
+     * Deletion order respects FK constraints:
+     * 1. Children of Accounts (Transactions) - handled by DB CASCADE
+     * 2. Children of Users (Accounts, PlaidItems, RefreshTokens)
+     * 3. User itself
      */
     public void deleteUserAndAllData(Integer userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 1. Delete all refresh tokens
-        refreshTokenRepo.deleteByUserId(userId);
+        // Delete in FK-safe order: children first, then parent
+        // Note: Transactions are automatically deleted via CASCADE when Accounts are deleted
 
-        // 2. Delete all Plaid items (removes access tokens)
-        plaidItemRepo.deleteByOwner_Id(userId);
-
-        // 3. Delete all accounts (cascade deletes transactions via JPA)
+        // 1. Delete accounts (this cascades to transactions via DB constraint)
         accountRepo.deleteByUserId(userId);
 
-        // 4. Delete the user account itself
+        // 2. Delete Plaid items (no children, safe to delete)
+        plaidItemRepo.deleteByOwner_Id(userId);
+
+        // 3. Delete refresh tokens (no children, safe to delete)
+        refreshTokenRepo.deleteByUserId(userId);
+
+        // 4. Delete the user account itself (all children are now gone)
         userRepo.delete(user);
     }
 }

@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,33 +28,70 @@ public class RefreshTokenService {
     }
 
     /**
+     * Hash a token using SHA-256
+     * This is secure for refresh tokens as they have high entropy (UUID-based)
+     */
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+
+            // Convert to hex string
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    /**
      * Create a new refresh token for the user
+     * Returns a TokenPair with both the plaintext token (to send to client)
+     * and the hashed token (stored in DB)
      */
     public RefreshToken createRefreshToken(User user) {
-        // Generate a secure random token
-        String tokenValue = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();
+        // Generate a secure random token (plaintext)
+        String plaintextToken = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();
+
+        // Hash it before storing
+        String hashedToken = hashToken(plaintextToken);
 
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(refreshTokenTtlDays);
 
-        RefreshToken refreshToken = new RefreshToken(tokenValue, user, expiresAt);
-        return refreshTokenRepository.save(refreshToken);
+        // Store the HASHED token in the database
+        RefreshToken refreshToken = new RefreshToken(hashedToken, user, expiresAt);
+        RefreshToken saved = refreshTokenRepository.save(refreshToken);
+
+        // IMPORTANT: We need to return the plaintext token to send to the client
+        // But the entity has the hashed version. We'll temporarily store plaintext in the entity
+        // just for returning to the controller
+        saved.setToken(plaintextToken);  // Temporarily set plaintext for return
+
+        return saved;
     }
 
     /**
-     * Find a refresh token by its value
+     * Find a refresh token by its value (hashes the token before lookup)
      */
     @Transactional(readOnly = true)
-    public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token);
+    public Optional<RefreshToken> findByToken(String plaintextToken) {
+        String hashedToken = hashToken(plaintextToken);
+        return refreshTokenRepository.findByToken(hashedToken);
     }
 
     /**
-     * Verify and get refresh token
+     * Verify and get refresh token (hashes the token before lookup)
      * Returns the token if it's valid, empty if invalid/expired/revoked
      */
     @Transactional(readOnly = true)
-    public Optional<RefreshToken> verifyRefreshToken(String token) {
-        return refreshTokenRepository.findByToken(token)
+    public Optional<RefreshToken> verifyRefreshToken(String plaintextToken) {
+        String hashedToken = hashToken(plaintextToken);
+        return refreshTokenRepository.findByToken(hashedToken)
                 .filter(RefreshToken::isValid);
     }
 

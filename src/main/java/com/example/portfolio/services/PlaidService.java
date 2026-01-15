@@ -152,6 +152,10 @@ public class PlaidService {
     // ---------------------------
     // 4. Sync transactions for a user
     // ---------------------------
+    // TODO: Migrate to Plaid's /transactions/sync endpoint with cursor-based pagination
+    // Current implementation uses /transactions/get which is being deprecated
+    // Cursor-based sync properly handles: modifications, removals, and incremental updates
+    // See: https://plaid.com/docs/api/products/transactions/#transactionssync
     public List<Transaction> syncTransactionsForUser(User user, LocalDate startDate, LocalDate endDate) throws IOException {
         List<PlaidItem> items = plaidItemRepository.findByOwner_Id(user.getId());
         List<Transaction> result = new ArrayList<>();

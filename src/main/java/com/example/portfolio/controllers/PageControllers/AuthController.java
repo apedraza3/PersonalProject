@@ -6,6 +6,7 @@ import com.example.portfolio.security.RateLimitService;
 import com.example.portfolio.services.RefreshTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,9 @@ public class AuthController {
     private final RateLimitService rateLimitService;
     private final RefreshTokenService refreshTokenService;
 
+    @Value("${app.cookies.secure:false}")
+    private boolean secureCookies;
+
     public AuthController(
             UserService userService,
             JwtUtil jwtUtil,
@@ -43,7 +47,7 @@ public class AuthController {
     private ResponseCookie createJwtCookie(String token) {
         return ResponseCookie.from("jwt", token)
                 .httpOnly(true)  // Prevents JavaScript access (XSS protection)
-                .secure(false)    // Set to true in production with HTTPS
+                .secure(secureCookies)  // Controlled by app.cookies.secure property
                 .path("/")
                 .maxAge(15 * 60)  // 15 minutes (matches JWT TTL)
                 .sameSite("Lax")  // CSRF protection
@@ -56,8 +60,8 @@ public class AuthController {
     private ResponseCookie createRefreshTokenCookie(String token) {
         return ResponseCookie.from("refresh_token", token)
                 .httpOnly(true)  // Prevents JavaScript access
-                .secure(false)    // Set to true in production with HTTPS
-                .path("/auth")   // Only send to auth endpoints
+                .secure(secureCookies)  // Controlled by app.cookies.secure property
+                .path("/api/auth")   // Updated to match new controller path
                 .maxAge(7 * 24 * 60 * 60)  // 7 days
                 .sameSite("Lax")
                 .build();
@@ -213,7 +217,7 @@ public class AuthController {
         // Clear both cookies
         ResponseCookie jwtCookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookies)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
@@ -221,8 +225,8 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", "")
                 .httpOnly(true)
-                .secure(false)
-                .path("/auth")
+                .secure(secureCookies)
+                .path("/api/auth")
                 .maxAge(0)
                 .sameSite("Lax")
                 .build();

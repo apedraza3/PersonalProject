@@ -19,6 +19,9 @@ public class PlaidItem {
 
     private String institutionName;
 
+    @Column(name = "transaction_cursor", columnDefinition = "TEXT")
+    private String transactionCursor;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User owner;
@@ -72,5 +75,13 @@ public class PlaidItem {
 
     public void setOwner(User owner) {
         this.owner = owner;
+    }
+
+    public String getTransactionCursor() {
+        return transactionCursor;
+    }
+
+    public void setTransactionCursor(String transactionCursor) {
+        this.transactionCursor = transactionCursor;
     }
 }
