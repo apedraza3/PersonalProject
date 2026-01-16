@@ -528,6 +528,9 @@
 
                 const transactions = await response.json();
 
+                // Update transaction count
+                document.getElementById('total-transactions').textContent = transactions.length;
+
                 if (!transactions || transactions.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
