@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: portfolio-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: portfolio
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-changeme}
+      MYSQL_ROOT_HOST: '%'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - portfolio-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portfolio-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      DB_URL: jdbc:mysql://db:3306/portfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+
+      # JWT Secret (REQUIRED - generate a secure random string)
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+
+      # Encryption Key (REQUIRED - 64 hex characters for AES-256)
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+
+      # Plaid Configuration
+      PLAID_ENV: ${PLAID_ENV:-sandbox}
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID}
+      PLAID_SECRET: ${PLAID_SECRET}
+      PLAID_PRODUCTS: ${PLAID_PRODUCTS:-transactions,balance,liabilities,investments}
+      PLAID_COUNTRY_CODES: ${PLAID_COUNTRY_CODES:-US}
+      PLAID_REDIRECT_URI: ${PLAID_REDIRECT_URI:-http://localhost:8080/plaid/callback}
+
+      # Cookie Security (set to true in production with HTTPS)
+      COOKIES_SECURE: ${COOKIES_SECURE:-false}
+
+      # CORS Origins
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:3000}
+
+      # Spring Profile (use 'prod' for production)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+    ports:
+      - "8080:8080"
+    networks:
+      - portfolio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  portfolio-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local

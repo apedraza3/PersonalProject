@@ -23,17 +23,23 @@ public class UserService {
     private final PlaidItemRepository plaidItemRepo;
     private final AccountRepository accountRepo;
     private final RefreshTokenRepository refreshTokenRepo;
+    private final com.example.portfolio.repositories.CryptoWalletRepository cryptoWalletRepo;
+    private final com.example.portfolio.repositories.ExchangeItemRepository exchangeItemRepo;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public UserService(
             UserRepository userRepo,
             PlaidItemRepository plaidItemRepo,
             AccountRepository accountRepo,
-            RefreshTokenRepository refreshTokenRepo) {
+            RefreshTokenRepository refreshTokenRepo,
+            com.example.portfolio.repositories.CryptoWalletRepository cryptoWalletRepo,
+            com.example.portfolio.repositories.ExchangeItemRepository exchangeItemRepo) {
         this.userRepo = userRepo;
         this.plaidItemRepo = plaidItemRepo;
         this.accountRepo = accountRepo;
         this.refreshTokenRepo = refreshTokenRepo;
+        this.cryptoWalletRepo = cryptoWalletRepo;
+        this.exchangeItemRepo = exchangeItemRepo;
     }
 
     // READ: get by id
@@ -127,10 +133,16 @@ public class UserService {
         // 2. Delete Plaid items (no children, safe to delete)
         plaidItemRepo.deleteByOwner_Id(userId);
 
-        // 3. Delete refresh tokens (no children, safe to delete)
+        // 3. Delete crypto wallets (this cascades to crypto transactions via DB constraint)
+        cryptoWalletRepo.deleteByOwner_Id(userId);
+
+        // 4. Delete exchange items (Coinbase, Binance OAuth connections)
+        exchangeItemRepo.deleteByOwner_Id(userId);
+
+        // 5. Delete refresh tokens (no children, safe to delete)
         refreshTokenRepo.deleteByUserId(userId);
 
-        // 4. Delete the user account itself (all children are now gone)
+        // 6. Delete the user account itself (all children are now gone)
         userRepo.delete(user);
     }
 }

@@ -306,6 +306,31 @@
 
         <div class="section">
             <div class="section-header">
+                <h2>Crypto Wallets</h2>
+                <button class="btn" onclick="showAddWalletModal()">Add Wallet</button>
+            </div>
+            <div id="crypto-wallets-container" class="loading">Loading wallets...</div>
+        </div>
+
+        <!-- Exchange Connections - Temporarily disabled until Coinbase OAuth is available
+        <div class="section">
+            <div class="section-header">
+                <h2>Exchange Connections</h2>
+                <a href="/api/exchange/coinbase/connect" class="btn">Connect Coinbase</a>
+            </div>
+            <div id="exchange-connections-container" class="loading">Loading...</div>
+        </div>
+        -->
+
+        <div class="section">
+            <div class="section-header">
+                <h2>Crypto Transactions</h2>
+            </div>
+            <div id="crypto-transactions-container">Loading...</div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
                 <h2>Account Settings</h2>
             </div>
             <div class="card" style="border: 1px solid #fed7d7;">
@@ -707,12 +732,394 @@
             window.location.href = '/auth';
         }
 
+        // ===========================================
+        // CRYPTO WALLET FUNCTIONS
+        // ===========================================
+
+        // Show/Hide Add Wallet Modal
+        function showAddWalletModal() {
+            document.getElementById('addWalletModal').style.display = 'flex';
+        }
+
+        function hideAddWalletModal() {
+            document.getElementById('addWalletModal').style.display = 'none';
+            document.getElementById('addWalletForm').reset();
+        }
+
+        // Add Wallet
+        async function addWallet(event) {
+            event.preventDefault();
+
+            const formData = {
+                walletAddress: document.getElementById('walletAddress').value,
+                blockchain: document.getElementById('blockchain').value,
+                walletName: document.getElementById('walletName').value || null
+            };
+
+            try {
+                // Refresh CSRF token
+                await fetch('/api/csrf', { credentials: 'include' });
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const csrfToken = getCsrfToken();
+                const response = await fetch('/api/crypto/wallets', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-XSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    alert('Wallet added successfully!');
+                    hideAddWalletModal();
+                    loadCryptoWallets();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to add wallet: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error adding wallet:', error);
+                alert('Failed to add wallet');
+            }
+        }
+
+        // Load Crypto Wallets
+        async function loadCryptoWallets() {
+            const container = document.getElementById('crypto-wallets-container');
+
+            try {
+                const response = await fetch('/api/crypto/wallets', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load wallets');
+                }
+
+                const wallets = await response.json();
+
+                if (!wallets || wallets.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💰</div>
+                            <p>No crypto wallets yet. Add your first wallet to track your crypto!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Display wallets
+                container.innerHTML = wallets.map(wallet => `
+                    <div class="card" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4 style="margin: 0 0 5px 0;">\${wallet.walletName || 'Crypto Wallet'}</h4>
+                                <p style="color: #666; font-size: 12px; margin: 0 0 10px 0; word-break: break-all;">\${wallet.walletAddress}</p>
+                                <p style="margin: 0; font-size: 14px;">
+                                    <span style="background: #e6f3ff; padding: 3px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">\${wallet.blockchain}</span>
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <p style="font-size: 20px; font-weight: bold; margin: 0;">\${parseFloat(wallet.balance).toFixed(6)} \${wallet.token}</p>
+                                <p style="color: #666; font-size: 14px; margin: 5px 0;">$\${parseFloat(wallet.balanceUsd).toFixed(2)}</p>
+                                <button onclick="syncCryptoTransactions(\${wallet.id})" class="btn" style="font-size: 12px; padding: 5px 10px; margin-top: 10px;">Sync</button>
+                                <button onclick="deleteCryptoWallet(\${wallet.id})" style="font-size: 12px; padding: 5px 10px; background: #fed7d7; color: #c53030; border: none; border-radius: 5px; cursor: pointer; margin-top: 5px;">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading wallets:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load wallets. Please try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Sync Crypto Transactions
+        async function syncCryptoTransactions(walletId) {
+            try {
+                // Refresh CSRF token
+                await fetch('/api/csrf', { credentials: 'include' });
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const csrfToken = getCsrfToken();
+                const response = await fetch(`/api/crypto/wallets/\${walletId}/sync`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'X-XSRF-TOKEN': csrfToken
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(result.message || 'Transactions synced successfully!');
+                    loadCryptoTransactions();
+                } else {
+                    alert('Failed to sync transactions');
+                }
+            } catch (error) {
+                console.error('Error syncing transactions:', error);
+                alert('Failed to sync transactions');
+            }
+        }
+
+        // Delete Crypto Wallet
+        async function deleteCryptoWallet(walletId) {
+            if (!confirm('Are you sure you want to delete this wallet? This will also delete all associated transactions.')) {
+                return;
+            }
+
+            try {
+                // Refresh CSRF token
+                await fetch('/api/csrf', { credentials: 'include' });
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const csrfToken = getCsrfToken();
+                const response = await fetch(`/api/crypto/wallets/\${walletId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'X-XSRF-TOKEN': csrfToken
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Wallet deleted successfully!');
+                    loadCryptoWallets();
+                    loadCryptoTransactions();
+                } else {
+                    alert('Failed to delete wallet');
+                }
+            } catch (error) {
+                console.error('Error deleting wallet:', error);
+                alert('Failed to delete wallet');
+            }
+        }
+
+        // Load Crypto Transactions
+        async function loadCryptoTransactions() {
+            const container = document.getElementById('crypto-transactions-container');
+
+            try {
+                const response = await fetch('/api/crypto/transactions', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load transactions');
+                }
+
+                const transactions = await response.json();
+
+                if (!transactions || transactions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <p>No crypto transactions yet. Sync your wallets to see transactions!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Display transactions in table
+                container.innerHTML = `
+                    <table class="transactions-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>From/To</th>
+                                <th>Amount</th>
+                                <th>Token</th>
+                                <th>TX Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            \${transactions.slice(0, 50).map(tx => `
+                                <tr>
+                                    <td>\${new Date(tx.date).toLocaleDateString()}</td>
+                                    <td>\${tx.type}</td>
+                                    <td style="font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">\${tx.type === 'send' ? tx.toAddress : tx.fromAddress}</td>
+                                    <td>\${parseFloat(tx.amount).toFixed(6)}</td>
+                                    <td>\${tx.token}</td>
+                                    <td><a href="https://etherscan.io/tx/\${tx.txHash}" target="_blank" style="font-size: 11px;">\${tx.txHash.substring(0, 10)}...</a></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+            } catch (error) {
+                console.error('Error loading crypto transactions:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load transactions.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ===================================
+        // Exchange Connections
+        // ===================================
+
+        // Load Exchange Connections
+        async function loadExchangeConnections() {
+            const container = document.getElementById('exchange-connections-container');
+            container.classList.add('loading');
+
+            try {
+                const response = await fetch('/api/exchange/connections', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch exchange connections');
+                }
+
+                const connections = await response.json();
+                container.classList.remove('loading');
+
+                if (connections.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔗</div>
+                            <p>No exchanges connected yet.</p>
+                            <p style="color: #666; font-size: 14px;">Click "Connect Coinbase" to link your exchange account.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Display connections and load accounts for each
+                container.innerHTML = connections.map(conn => `
+                    <div class="card" id="exchange-\${conn.id}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3>\${conn.connectionName || conn.exchange}</h3>
+                                <p style="color: #666; font-size: 14px;">Connected: \${new Date(conn.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <button class="btn-danger" onclick="disconnectExchange(\${conn.id})">Disconnect</button>
+                        </div>
+                        <div id="exchange-\${conn.id}-accounts" class="loading">Loading accounts...</div>
+                    </div>
+                `).join('');
+
+                // Load Coinbase accounts if connected
+                const coinbase = connections.find(c => c.exchange === 'coinbase');
+                if (coinbase) {
+                    loadCoinbaseAccounts(coinbase.id);
+                }
+
+            } catch (error) {
+                container.classList.remove('loading');
+                console.error('Error loading exchange connections:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load exchange connections.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load Coinbase Accounts
+        async function loadCoinbaseAccounts(exchangeId) {
+            const container = document.getElementById('exchange-' + exchangeId + '-accounts');
+
+            try {
+                const response = await fetch('/api/exchange/coinbase/accounts', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch Coinbase accounts');
+                }
+
+                const accounts = await response.json();
+                container.classList.remove('loading');
+
+                if (accounts.length === 0) {
+                    container.innerHTML = '<p style="color: #666;">No accounts found.</p>';
+                    return;
+                }
+
+                // Filter accounts with non-zero balances
+                const activeAccounts = accounts.filter(acc => parseFloat(acc.balance) > 0);
+
+                const accountsHtml = activeAccounts.map(acc =>
+                    '<div style="background: #f7fafc; padding: 15px; border-radius: 8px;">' +
+                        '<div style="font-weight: 600; margin-bottom: 5px;">' + acc.currency + '</div>' +
+                        '<div style="font-size: 20px; color: #667eea; margin-bottom: 5px;">' +
+                            parseFloat(acc.balance).toFixed(8) +
+                        '</div>' +
+                        '<div style="color: #666; font-size: 14px;">$' +
+                            parseFloat(acc.balanceUsd).toFixed(2) +
+                        '</div>' +
+                    '</div>'
+                ).join('');
+
+                container.innerHTML =
+                    '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">' +
+                        accountsHtml +
+                    '</div>';
+
+            } catch (error) {
+                container.classList.remove('loading');
+                console.error('Error loading Coinbase accounts:', error);
+                container.innerHTML = '<p style="color: #e53e3e;">Failed to load accounts.</p>';
+            }
+        }
+
+        // Disconnect Exchange
+        async function disconnectExchange(exchangeId) {
+            if (!confirm('Are you sure you want to disconnect this exchange?')) {
+                return;
+            }
+
+            try {
+                await refreshCsrfToken();
+
+                const response = await fetch('/api/exchange/' + exchangeId, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-XSRF-TOKEN': getCsrfToken()
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to disconnect exchange');
+                }
+
+                alert('Exchange disconnected successfully!');
+                loadExchangeConnections();
+
+            } catch (error) {
+                console.error('Error disconnecting exchange:', error);
+                alert('Failed to disconnect exchange.');
+            }
+        }
+
         // Load data on page load
         async function initializeDashboard() {
             await initCsrf();  // Initialize CSRF token first
             loadUserInfo();
             loadAccounts();
             loadTransactions();
+            loadCryptoWallets();
+            loadExchangeConnections();
+            loadCryptoTransactions();
         }
         initializeDashboard();
     </script>
@@ -722,5 +1129,36 @@
         <span>•</span>
         <a href="/terms" style="color: #667eea; text-decoration: none; margin: 0 10px;">Terms of Service</a>
     </footer>
+
+    <!-- Add Wallet Modal -->
+    <div id="addWalletModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%;">
+            <h2>Add Crypto Wallet</h2>
+            <form id="addWalletForm" onsubmit="addWallet(event)">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Blockchain:</label>
+                    <select id="blockchain" name="blockchain" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                        <option value="ethereum">Ethereum</option>
+                        <option value="bitcoin">Bitcoin</option>
+                        <option value="polygon">Polygon</option>
+                        <option value="solana">Solana</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Wallet Address:</label>
+                    <input type="text" id="walletAddress" name="walletAddress" placeholder="0x... or bc1..." required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <small style="color: #666;">Enter your public wallet address (read-only, no private keys needed)</small>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Wallet Name (Optional):</label>
+                    <input type="text" id="walletName" name="walletName" placeholder="My Main Wallet" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="hideAddWalletModal()" style="padding: 10px 20px; background: #e2e8f0; border: none; border-radius: 5px; cursor: pointer;">Cancel</button>
+                    <button type="submit" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Add Wallet</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
